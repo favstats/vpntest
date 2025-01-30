@@ -1,97 +1,33 @@
-name: Brute Force NordVPN Setup and Rotation
+name: VPN Rotation on Push
 
 on:
   push:
     branches:
-      - main  # Runs only when pushing to main
-  workflow_dispatch:  # Allows manual trigger
+      - main
 
 jobs:
   vpn-rotation:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v2
 
-      - name: Install NordVPN via Snap
+      - name: Set Up Docker
         run: |
-          sudo snap install nordvpn || echo "❌ Snap install failed"
-          sudo snap list nordvpn || echo "❌ NordVPN not listed in Snap"
+          sudo apt-get update
+          sudo apt-get install -y docker.io
 
-      - name: Bruteforce NordVPN Service Startup
+      - name: Run NordVPN Container
+        env:
+          NORDVPN_TOKEN: ${{ secrets.NORDVPN_TOKEN }}
         run: |
-          echo "Trying different service start methods..."
-          
-          sudo snap restart nordvpn && echo "✅ snap restart worked!" || echo "❌ snap restart failed"
-          
-          sudo systemctl enable --now nordvpnd && echo "✅ systemctl enable --now nordvpnd worked!" || echo "❌ systemctl failed"
-          
-          sudo /etc/init.d/nordvpn start && echo "✅ /etc/init.d/nordvpn start worked!" || echo "❌ init.d failed"
+          docker run -d --name nordvpn --cap-add=NET_ADMIN --cap-add=NET_RAW \
+            -e TOKEN=$NORDVPN_TOKEN \
+            -e CONNECT=United_States \
+            -e TECHNOLOGY=NordLynx \
+            ghcr.io/bubuntux/nordvpn
 
-          if [ -x "$(command -v nordvpn)" ]; then
-            echo "✅ NordVPN CLI is installed"
-          else
-            echo "❌ NordVPN CLI is missing!"
-            exit 1
-          fi
-
-      - name: Check NordVPN Status & Debug Logs
+      - name: Verify VPN Connection
         run: |
-          echo "Checking NordVPN status..."
-          nordvpn status || echo "❌ nordvpn status command failed"
-          journalctl -u nordvpnd --no-pager || echo "❌ journalctl failed"
-          sudo snap logs nordvpn || echo "❌ snap logs failed"
-
-      - name: Wait for NordVPN Service to Start
-        run: |
-          for i in {1..10}; do
-            if nordvpn status &>/dev/null; then
-              echo "✅ NordVPN service is running!"
-              exit 0
-            fi
-            echo "⏳ Waiting for NordVPN service to start... Attempt $i/10"
-            sleep 3
-          done
-          echo "❌ NordVPN service failed to start."
-          exit 1
-
-      - name: Login to NordVPN (Try All Methods)
-        run: |
-          echo "Trying login with token..."
-          nordvpn login --token ${{ secrets.NORDVPN_TOKEN }} && echo "✅ Login successful" || echo "❌ Login failed"
-
-          echo "Trying login callback (if needed)..."
-          nordvpn login --callback || echo "❌ Callback login failed"
-
-      - name: Connect to VPN (Try Different Countries)
-        run: |
-          echo "Trying default connection..."
-          nordvpn connect && echo "✅ Default connection worked!" || echo "❌ Default connection failed"
-
-          echo "Trying country-specific connection..."
-          nordvpn connect United_States && echo "✅ United States worked!" || echo "❌ US failed"
-          nordvpn connect Germany && echo "✅ Germany worked!" || echo "❌ Germany failed"
-          nordvpn connect France && echo "✅ France worked!" || echo "❌ France failed"
-
-      - name: Confirm Initial VPN Connection (Check Public IP)
-        run: |
-          curl -s ifconfig.me || echo "❌ Failed to fetch public IP"
-
-      - name: Rotate VPN (Try All Methods)
-        run: |
-          echo "Trying disconnect..."
-          nordvpn disconnect && echo "✅ Disconnect worked!" || echo "❌ Disconnect failed"
-
-          sleep 5
-          
-          echo "Trying reconnect to random country..."
-          nordvpn connect $(shuf -n 1 -e United_States Germany France Netherlands) && echo "✅ Random country worked!" || echo "❌ Random connect failed"
-
-      - name: Confirm New VPN Connection (Check New IP)
-        run: |
-          curl -s ifconfig.me || echo "❌ Failed to fetch new public IP"
-
-      - name: Final VPN Debug Logs
-        run: |
-          nordvpn status || echo "❌ nordvpn status failed"
-          sudo snap logs nordvpn || echo "❌ snap logs failed"
+          sleep 10  # Wait for the VPN to establish
+          docker exec nordvpn curl -s https://api.myip.com
