@@ -3,19 +3,20 @@ name: VPN Rotation on Push
 on:
   push:
     branches:
-      - main
+      - main  # Runs only when pushing to main
+  workflow_dispatch:  # Allows manual trigger
 
 jobs:
   vpn-rotation:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
-      - name: Set Up Docker
+      - name: Install Docker Properly
         run: |
-          sudo apt-get update
-          sudo apt-get install -y docker.io
+          curl -fsSL https://get.docker.com | sudo sh
+          sudo systemctl enable --now docker
 
       - name: Run NordVPN Container
         env:
@@ -30,4 +31,4 @@ jobs:
       - name: Verify VPN Connection
         run: |
           sleep 10  # Wait for the VPN to establish
-          docker exec nordvpn curl -s https://api.myip.com
+          docker exec nordvpn curl -s ifconfig.me
