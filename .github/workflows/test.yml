@@ -3,8 +3,7 @@ name: NordVPN Rotation on Push
 on:
   push:
     branches:
-      - main  # Runs only on push to main
-
+      - main  # Runs only when pushing to main
   workflow_dispatch:  # Allows manual trigger
 
 jobs:
@@ -14,39 +13,25 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install NordVPN CLI (Latest Version)
+      - name: Install NordVPN via Snap
         run: |
-          # Fetch the latest NordVPN package URL dynamically
-          LATEST_NORDVPN_URL=$(curl -s https://repo.nordvpn.com/deb/nordvpn/debian/pool/main/ | grep -o 'nordvpn_[0-9.]*-1_amd64.deb' | sort -V | tail -n1)
-          
-          if [[ -z "$LATEST_NORDVPN_URL" ]]; then
-            echo "Failed to get the latest NordVPN package URL."
-            exit 1
-          fi
-
-          # Download the latest NordVPN package
-          wget -qO nordvpn.deb "https://repo.nordvpn.com/deb/nordvpn/debian/pool/main/$LATEST_NORDVPN_URL"
-          
-          # Install NordVPN
-          sudo apt install -y ./nordvpn.deb
-          
-          # Remove the package file after installation
-          rm nordvpn.deb
+          sudo snap install nordvpn
+          sudo nordvpn set technology nordlynx  # Use WireGuard for best speed
 
       - name: Login to NordVPN
         run: nordvpn login --token ${{ secrets.NORDVPN_TOKEN }}
 
-      - name: Connect to VPN
-        run: nordvpn connect
+      - name: Connect to VPN (Initial Connection)
+        run: nordvpn connect United_States
 
-      - name: Confirm VPN Connection
+      - name: Confirm Initial VPN Connection (Check Public IP)
         run: curl -s ifconfig.me  # Outputs current public IP
 
-      - name: Rotate VPN (Change Server)
+      - name: Rotate VPN (Change Server Once)
         run: |
           nordvpn disconnect
           sleep 5
-          nordvpn connect Germany  # Change to a specific country
+          nordvpn connect Germany  # Change to a new server
 
-      - name: Confirm New VPN Connection
+      - name: Confirm New VPN Connection (Check New IP)
         run: curl -s ifconfig.me  # Outputs new public IP
