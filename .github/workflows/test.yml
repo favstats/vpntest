@@ -13,10 +13,10 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install Docker Properly
+      - name: Ensure Docker is Running
         run: |
-          curl -fsSL https://get.docker.com | sudo sh
-          sudo systemctl enable --now docker
+          sudo systemctl restart docker || echo "Docker restart failed"
+          sudo docker info || echo "Docker is not running!"
 
       - name: Run NordVPN Container
         env:
@@ -28,7 +28,40 @@ jobs:
             -e TECHNOLOGY=NordLynx \
             ghcr.io/bubuntux/nordvpn
 
-      - name: Verify VPN Connection
+      - name: Wait for VPN to Establish
+        run: sleep 10  # Ensure the VPN has time to connect
+
+      - name: Get Initial Public IP
+        id: initial_ip
         run: |
-          sleep 10  # Wait for the VPN to establish
-          docker exec nordvpn curl -s ifconfig.me
+          INITIAL_IP=$(docker exec nordvpn curl -s ifconfig.me)
+          echo "Initial Public IP: $INITIAL_IP"
+          echo "INITIAL_IP=$INITIAL_IP" >> $GITHUB_ENV
+
+      - name: Rotate VPN (Switch Server)
+        run: |
+          docker exec nordvpn nordvpn disconnect
+          sleep 5
+          docker exec nordvpn nordvpn connect Germany
+
+      - name: Wait for New VPN Connection
+        run: sleep 10  # Give time for reconnection
+
+      - name: Get New Public IP
+        id: new_ip
+        run: |
+          NEW_IP=$(docker exec nordvpn curl -s ifconfig.me)
+          echo "New Public IP: $NEW_IP"
+          echo "NEW_IP=$NEW_IP" >> $GITHUB_ENV
+
+      - name: Compare IPs
+        run: |
+          echo "✅ VPN Rotation Successful!"
+          echo "🌍 Initial Public IP: $INITIAL_IP"
+          echo "🌎 New Public IP: $NEW_IP"
+          if [ "$INITIAL_IP" = "$NEW_IP" ]; then
+            echo "❌ VPN Rotation Failed: IPs did not change."
+            exit 1
+          else
+            echo "✅ VPN Rotation Confirmed: IP changed successfully!"
+          fi
