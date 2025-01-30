@@ -1,0 +1,38 @@
+name: NordVPN Rotation on Push
+
+on:
+  push:
+    branches:
+      - main  # Runs only when pushing to the main branch
+
+  workflow_dispatch:  # Allows manual trigger in GitHub Actions
+
+jobs:
+  vpn-rotation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install NordVPN CLI
+        run: |
+          sudo apt update
+          sudo apt install -y nordvpn
+
+      - name: Login to NordVPN
+        run: nordvpn login --token ${{ secrets.NORDVPN_TOKEN }}
+
+      - name: Connect to VPN
+        run: nordvpn connect
+
+      - name: Confirm VPN Connection
+        run: curl -s ifconfig.me  # Outputs current public IP
+
+      - name: Rotate VPN (Change Server)
+        run: |
+          nordvpn disconnect
+          sleep 5
+          nordvpn connect France  # Change to a specific country
+
+      - name: Confirm New VPN Connection
+        run: curl -s ifconfig.me  # Outputs new public IP
