@@ -16,7 +16,7 @@ jobs:
       - name: Install NordVPN via Snap
         run: |
           sudo snap install nordvpn
-          sudo nordvpn set technology nordlynx  # Use WireGuard for best speed
+          sudo systemctl enable --now nordvpnd || sudo /etc/init.d/nordvpn start  # Start the NordVPN service
 
       - name: Login to NordVPN
         run: nordvpn login --token ${{ secrets.NORDVPN_TOKEN }}
