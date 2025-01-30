@@ -3,7 +3,7 @@ name: NordVPN Rotation on Push
 on:
   push:
     branches:
-      - main  # Runs only when pushing to main
+      - main  # Runs only on push to main
 
   workflow_dispatch:  # Allows manual trigger
 
@@ -14,11 +14,24 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install NordVPN CLI (Direct Download)
+      - name: Install NordVPN CLI (Latest Version)
         run: |
-          wget -qO nordvpn.deb https://repo.nordvpn.com/deb/nordvpn/debian/pool/main/nordvpn_3.16.4-1_amd64.deb
+          # Fetch the latest NordVPN package URL dynamically
+          LATEST_NORDVPN_URL=$(curl -s https://repo.nordvpn.com/deb/nordvpn/debian/pool/main/ | grep -o 'nordvpn_[0-9.]*-1_amd64.deb' | sort -V | tail -n1)
+          
+          if [[ -z "$LATEST_NORDVPN_URL" ]]; then
+            echo "Failed to get the latest NordVPN package URL."
+            exit 1
+          fi
+
+          # Download the latest NordVPN package
+          wget -qO nordvpn.deb "https://repo.nordvpn.com/deb/nordvpn/debian/pool/main/$LATEST_NORDVPN_URL"
+          
+          # Install NordVPN
           sudo apt install -y ./nordvpn.deb
-          rm nordvpn.deb  # Clean up installation file
+          
+          # Remove the package file after installation
+          rm nordvpn.deb
 
       - name: Login to NordVPN
         run: nordvpn login --token ${{ secrets.NORDVPN_TOKEN }}
@@ -33,7 +46,7 @@ jobs:
         run: |
           nordvpn disconnect
           sleep 5
-          nordvpn connect France  # Change to a specific country
+          nordvpn connect Germany  # Change to a specific country
 
       - name: Confirm New VPN Connection
         run: curl -s ifconfig.me  # Outputs new public IP
