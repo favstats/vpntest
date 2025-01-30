@@ -3,9 +3,9 @@ name: NordVPN Rotation on Push
 on:
   push:
     branches:
-      - main  # Runs only when pushing to the main branch
+      - main  # Runs only when pushing to main
 
-  workflow_dispatch:  # Allows manual trigger in GitHub Actions
+  workflow_dispatch:  # Allows manual trigger
 
 jobs:
   vpn-rotation:
@@ -14,10 +14,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install NordVPN CLI
+      - name: Install NordVPN CLI (Direct Download)
         run: |
-          sudo apt update
-          sudo apt install -y nordvpn
+          wget -qO nordvpn.deb https://repo.nordvpn.com/deb/nordvpn/debian/pool/main/nordvpn_3.16.4-1_amd64.deb
+          sudo apt install -y ./nordvpn.deb
+          rm nordvpn.deb  # Clean up installation file
 
       - name: Login to NordVPN
         run: nordvpn login --token ${{ secrets.NORDVPN_TOKEN }}
